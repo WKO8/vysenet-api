@@ -58,6 +58,13 @@ class NetworkMonitor:
             }
             self.save_authorized_devices()
 
+    def remove_authorized_device(self, mac):
+        if mac in self.authorized_devices:
+            del self.authorized_devices[mac]
+            self.save_authorized_devices()
+            return True
+        return False
+    
     def check_unauthorized_devices(self, devices):
         return {
             mac: info
@@ -117,6 +124,23 @@ def get_authorized():
     if not monitor:
         return jsonify({"error": "Monitor não inicializado"}), 400
     return jsonify(monitor.authorized_devices)
+
+
+@app.route("/authorized", methods=["DELETE"])
+def delete_authorized_device():
+    if not monitor:
+        return jsonify({"error": "Monitor não inicializado"}), 400
+
+    data = request.get_json()
+    mac = data.get("mac")
+    if not mac:
+        return jsonify({"error": "Campo 'mac' é obrigatório."}), 400
+
+    success = monitor.remove_authorized_device(mac)
+    if success:
+        return jsonify({"message": f"Dispositivo {mac} removido com sucesso."})
+    else:
+        return jsonify({"error": f"Dispositivo {mac} não encontrado."}), 404
 
 
 @app.route("/unauthorized", methods=["GET"])
