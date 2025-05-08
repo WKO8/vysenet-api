@@ -5,6 +5,7 @@ import os
 import time
 from datetime import datetime
 from scapy.all import ARP, Ether, srp, get_if_list, get_if_addr
+from scapy.arch.windows import get_windows_if_list
 
 AUTHORIZED_DEVICES_FILE = "authorized_devices.json"
 
@@ -12,7 +13,6 @@ app = Flask(__name__)
 monitor = None
 monitor_thread = None
 monitoring = False
-
 
 class NetworkMonitor:
     def __init__(self, interface=None, network=None):
@@ -76,13 +76,23 @@ class NetworkMonitor:
 @app.route("/interfaces", methods=["GET"])
 def list_interfaces():
     interfaces = []
-    for iface in get_if_list():
-        try:
-            ip = get_if_addr(iface)
-            network = ip.rpartition('.')[0] + '.0/24'
-            interfaces.append({"interface": iface, "ip": ip, "network": network})
-        except Exception:
-            continue
+    for iface in get_windows_if_list():
+        name = iface.get("name")
+        guid = iface.get("guid")
+        npf_name = f"\\Device\\NPF_{guid}"
+        ip_list = iface.get("ips", [])
+
+        # Filtra apenas IPv4 válidos
+        ipv4 = [ip for ip in ip_list if '.' in ip and not ip.startswith('127.')]
+        networks = [ip.rpartition('.')[0] + '.0/24' for ip in ipv4]
+
+        if ipv4:  # Apenas adiciona interfaces com IPv4
+            interfaces.append({
+                "interface": npf_name,
+                "ip": ipv4,
+                "network": networks
+            })
+
     return jsonify(interfaces)
 
 
